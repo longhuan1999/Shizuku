@@ -1,86 +1,86 @@
 # Shizuku
 
-## Background
+## 背景
 
-When developing apps that requires root, the most common method is to run some commands in the su shell. For example, there is an app that uses the `pm enable/disable` command to enable/disable components.
+在开发需要root权限的应用程序时，最常用的方法是在su shell中运行一些命令。例如，使用“pm enable/disable”命令来启用/禁用组件。
 
-This method has very big disadvantages:
+此类做法的缺点在于：
 
-1. **Extremely slow** (Multiple process creation)
-2. Needs to process texts (**Super unreliable**)
-3. The possibility is limited to available commands
-4. Even if ADB has sufficient permissions, the app requires root privileges to run
+1. **极慢** （会创建多个进程）
+2. 需要处理文本来获取结果（**超级不可靠**）
+3. 功能受制于可用的指令
+4. 即使 adb 有足够权限，应用也要求 root 权限才可使用
 
-Shizuku uses a completely different way. See detailed description below.
+Shizuku 采用了完全不同的方式。请参阅下面的详细说明。
 
-## User guide & Download
+## 用户指南 & 下载
 
 <https://shizuku.rikka.app/>
 
-## How does Shizuku work?
+## Shizuku 是如何工作的？
 
-First, we need to talk about how app use system APIs. For example, if the app wants to get installed apps, we all know we should use `PackageManager#getInstalledPackages()`. This is actually an interprocess communication (IPC) process of the app process and system server process, just the Android framework did the inner works for us.
+首先，我们需要谈谈应用是如何使用系统API的。例如，当应用想要获取已安装应用列表时，我们都知道应该使用 `PackageManager#getInstalledPackages()` 。这实际上是应用进程和系统服务进程间通信（IPC）的过程，只是Android框架为我们做了内部工作。
 
-Android uses `binder` to do this type of IPC. `Binder` allows the server-side to learn the uid and pid of the client-side, so that the system server can check if the app has the permission to do the operation.
+Android使用 `binder` 来完成这种类型的IPC。 `Binder` 允许服务端学习客户端的uid和pid，以便系统服务可以检查应用是否具有执行该操作的权限。
 
-Usually, if there is a "manager" (e.g., `PackageManager`) for apps to use, there should be a "service" (e.g., `PackageManagerService`) in the system server process. We can simply think if the app holds the `binder` of the "service", it can communicate with the "service". The app process will receive binders of system services on start.
+通常，如果有一个 "manager" （例如，`PackageManager`）供应用使用，那么系统服务进程中应该有一个 "service" （例如，`PackageManager`）。我们可以简单地认为，如果应用拥有此 "service" 的 `binder` ，它就可以与 "service" 进行通信。应用进程将在启动时接收系统服务的绑定（binders）。
 
-Shizuku guides users to run a process, Shizuku server, with root or ADB first. When the app starts, the `binder` to Shizuku server will also be sent to the app.
+Shizuku app 会引导用户使用 root 或是 adb 方式运行一个进程（Shizuku 服务进程）。当应用启动时，存在于 Shizuku 服务进程的 `binder` 也会发送至应用进程。
 
-The most important feature Shizuku provides is something like be a middle man to receive requests from the app, sent them to the system server, and send back the results. You can see the `transactRemote` method in `rikka.shizuku.server.ShizukuService` class, and `moe.shizuku.api.ShizukuBinderWrapper` class for the detail.
+Shizuku 所提供的最重要的功能是充当中间人来从应用接收请求，再将它们发送到系统服务，然后返回结果。有关详细信息，您可以在 `rikka.shizuku.server.ShizukuService` 类和 `moe.shizuku.api.ShizukuBinderWrapper` 类中看到 `Transact-Remote` 方法。
 
 So, we reached our goal, to use system APIs with higher permission. And to the app, it is almost identical to the use of system APIs directly.
+至此，我们达到了以更高的权限使用系统API的目的。对于应用来说，它与直接调用系统 API 体验几乎一致。
 
-## Developer guide
+## 开发者指南
 
-### API & sample
+### API & 实例
 
 https://github.com/RikkaApps/Shizuku-API
 
-### Migrating from pre-v11
+### 从v11之前的版本迁移
 
-> Existing applications still works, of course.
+> 当然，现有的应用仍然可以工作。
 
 https://github.com/RikkaApps/Shizuku-API#migration-guide-for-existing-applications-use-shizuku-pre-v11
 
-### Attention
+### 注意
 
-1. ADB permissions are limited
+1. ADB 权限依然有限
 
-   ADB has limited permissions and different on various system versions. You can see permissions granted to ADB [here](https://github.com/aosp-mirror/platform_frameworks_base/blob/master/packages/Shell/AndroidManifest.xml).
+   ADB 仅有有限的权限并且在不同系统中有所区别。您可以在[此处](https://github.com/aosp-mirror/platform_frameworks_base/blob/master/packages/Shell/AndroidManifest.xml)查看ADB被授予的权限。
 
-   Before calling the API, you can use `ShizukuService#getUid` to check if Shizuku is running user ADB, or use `ShizukuService#checkPermission` to check if the server has sufficient permissions.
+   在调用API之前，可以使用 `ShizukuService#getUid` 检查 Shizuku 是否在运行用户ADB，或者使用 `ShizukuService#checkPermission` 检查 Shizuku 服务是否具有足够的权限。
 
-2. Hidden API limitation from Android 9
+2. Android 9 隐藏API的使用限制
 
-   As of Android 9, the usage of the hidden APIs is limited for normal apps. Please use other methods (such as <https://github.com/LSPosed/AndroidHiddenApiBypass>).
+   从Android 9开始，普通应用程序对隐藏API的使用受到限制。请使用其他方法（例如 <https://github.com/LSPosed/AndroidHiddenApiBypass>）。
 
 3. Android 8.0 & ADB
 
-   At present, the way Shizuku service gets the app process is to combine `IActivityManager#registerProcessObserver` and `IActivityManager#registerUidObserver` (26+) to ensure that the app process will be sent when the app starts. However, on API 26, ADB lacks permissions to use `registerUidObserver`, so if you need to use Shizuku in a process that might not be started by an Activity, it is recommended to trigger the send binder by starting a transparent activity.
+   目前，Shizuku 服务获取应用进程的方式是将 `IActivityManager#registerProcessObserver` 和 `IActivityManager#registerUidObserver` (26+) 结合起来，以确保在应用启动时获得应用进程。但是，在API 26上，ADB没有使用e `registerUidObserver`的权限，因此如果您需要在一个可能不是由 Activity（活动） 启动的进程中使用 Shizuku，建议通过启动一个透明活动来触发发送绑定。
 
-4. Direct use of `transactRemote` requires attention
+4. 直接使用 `transactRemote` 需要注意的地方
 
-   * The API may be different under different Android versions, please be sure to check it carefully. Also, the `android.app.IActivityManager` has the aidl form in API 26 and later, and `android.app.IActivityManager$Stub` exists only on API 26.
+   * 不同Android版本下的API可能不同，请务必仔细检查。此外， `android.app.IActivityManager` 在API 26以及更高版本中具有aidl表单，并且 `android.app.IActivityManager$Stub` 仅在API 26上存在。
 
-   * `SystemServiceHelper.getTransactionCode` may not get the correct transaction code, such as `android.content.pm.IPackageManager$Stub.TRANSACTION_getInstalledPackages` does not exist on API 25 and there is `android.content.pm.IPackageManager$Stub.TRANSACTION_getInstalledPackages_47` (this situation has been dealt with, but it is not excluded that there may be other circumstances). This problem is not encountered with the `ShizukuBinderWrapper` method.
+   * `SystemServiceHelper.getTransactionCode` 可能无法获取正确的Transaction代码，例如 `android.content.pm.IPackageManager$Stub.TRANSACTION_getInstalledPackages` 在API 25上不存在，但存在 `android.content.pm.IPackageManager$Stub.TRANSACTION_getInstalledPackages_47` （这种情况已经得到处理，但不排除可能存在其他情况）。 `ShizukuBinderWrapper` 方法没有遇到这个问题。
 
-## Developing Shizuku itself
-
+## 开发 Shizuku
 ### Build
 
-- Clone with `git clone --recurse-submodules`
-- Run gradle task `:manager:assembleDebug` or `:manager:assembleRelease`
+- 通过 `git clone --recurse-submodules` 克隆
+- 运行 `:manager:assembleDebug` 或者 `:manager:assembleRelease` gradle 任务
 
-The `:manager:assembleDebug` task generates a debuggable server. You can attach a debugger to `shizuku_server` to debug the server.
+`:manager:assembleDebug` 任务会生成一个可调试的服务。您可以将调试器附加到 `shizuku_server` 以调试 Shizuku 服务。
 
 ## License
 
-This project is available under the Apache-2.0 license.
+此项目在 Apache-2.0 授权许可协议下可用。
 
 ### Exceptions
 
-* You are **FORBIDDEN** to use image files listed below in any way (unless for displaying Shizuku itself).
+* **禁止**以任何方式使用下面列出的图像文件（除非用于展示 Shizuku 本身）。
 
   ```
   manager/src/main/res/mipmap-hdpi/ic_launcher.png
@@ -97,4 +97,4 @@ This project is available under the Apache-2.0 license.
   manager/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png
   ```
 
-* You are **FORBIDDEN** to distribute the apk compiled by you (including modified, e.g., rename "Shizuku" to something else) to any store (IBNLT Google Play Store, etc.).
+* **禁止**将您自己编译的apk（包括修改过的，例如将 "Shizuku" 重命名）分发到任何商店（IBNLT Google Play商店等）。
