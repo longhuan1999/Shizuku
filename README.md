@@ -36,13 +36,13 @@ So, we reached our goal, to use system APIs with higher permission. And to the a
 
 ### API & 实例
 
-https://github.com/RikkaApps/Shizuku-API
+https://github.com/longhuan1999/Shizuku-API
 
 ### 从v11之前的版本迁移
 
 > 当然，现有的应用仍然可以工作。
 
-https://github.com/RikkaApps/Shizuku-API#migration-guide-for-existing-applications-use-shizuku-pre-v11
+https://github.com/longhuan1999/Shizuku-API#migration-guide-for-existing-applications-use-shizuku-pre-v11
 
 ### 注意
 
